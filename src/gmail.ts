@@ -17,7 +17,7 @@ export async function sendReceiptEmail(
   const gmail = google.gmail({ version: 'v1', auth: createOAuth2Client() });
 
   const boundary = 'boundary_' + Date.now();
-  const subject = `【領収書】会費のお支払いありがとうございます（${receiptNumber}）`;
+  const subject = `【領収書】KAIB年会費のお支払いありがとうございます（${receiptNumber}）`;
 
   const messageParts = [
     `To: ${to}`,
@@ -33,7 +33,7 @@ export async function sendReceiptEmail(
       [
         `${memberName} 様`,
         '',
-        'この度は会費のお振込みをいただき、誠にありがとうございます。',
+        'この度はKAIB年会費のお振込みをいただき、誠にありがとうございます。',
         '領収書を添付いたしますので、ご確認ください。',
         '',
         'ご不明な点がございましたら、お気軽にお問い合わせください。',
