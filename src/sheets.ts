@@ -38,10 +38,10 @@ export async function getMembers(): Promise<Member[]> {
     return [];
   }
 
-  // 顧客管理データから入金確認・入金日・領収書送付完了を取得（K〜M列）
+  // 顧客管理データから入金確認・入金日・領収書送付完了を取得（J〜L列）
   const paymentRes = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!K2:M`,
+    range: `'${config.managementSheetName}'!J2:L`,
   });
   const paymentRows = paymentRes.data.values || [];
 
@@ -56,20 +56,20 @@ export async function getMembers(): Promise<Member[]> {
     expectedDate: row[6] || '',           // G列: 振込予定日
     forumParticipation: row[7] || '',     // H列: フォーラム参加希望
     mentoringParticipation: row[8] || '', // I列: メンタリング参加希望
-    paymentConfirmed: paymentRows[index]?.[0] || '',  // 顧客管理データ K列: 入金確認
-    paymentDate: paymentRows[index]?.[1] || '',        // 顧客管理データ L列: 入金日
-    receiptSent: paymentRows[index]?.[2] || '',        // 顧客管理データ M列: 領収書送付完了
+    paymentConfirmed: paymentRows[index]?.[0] || '',  // 顧客管理データ J列: 入金確認
+    paymentDate: paymentRows[index]?.[1] || '',        // 顧客管理データ K列: 入金日
+    receiptSent: paymentRows[index]?.[2] || '',        // 顧客管理データ L列: 領収書送付完了
   }));
 }
 
 /**
- * 顧客管理データのK〜M列のヘッダーが未設定なら書き込む（初回実行時のみ）
+ * 顧客管理データのJ〜L列のヘッダーが未設定なら書き込む（初回実行時のみ）
  */
 export async function ensurePaymentHeaders(): Promise<void> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!K1:M1`,
+    range: `'${config.managementSheetName}'!J1:L1`,
   });
 
   const headers = res.data.values?.[0] || [];
@@ -77,7 +77,7 @@ export async function ensurePaymentHeaders(): Promise<void> {
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!K1:M1`,
+    range: `'${config.managementSheetName}'!J1:L1`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [['入金確認', '入金日', '領収書送付完了']],
@@ -86,7 +86,7 @@ export async function ensurePaymentHeaders(): Promise<void> {
 }
 
 /**
- * 顧客管理データのK列に◯、L列に入金日を書き込む
+ * 顧客管理データのJ列に◯、K列に入金日を書き込む
  */
 export async function markPaymentConfirmed(
   rowIndex: number,
@@ -95,7 +95,7 @@ export async function markPaymentConfirmed(
   const sheets = getSheets();
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!K${rowIndex}:L${rowIndex}`,
+    range: `'${config.managementSheetName}'!J${rowIndex}:K${rowIndex}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [['◯', paymentDate]],
@@ -104,7 +104,7 @@ export async function markPaymentConfirmed(
 }
 
 /**
- * 顧客管理データのM列に◯と領収書番号を書き込む（領収書送付完了）
+ * 顧客管理データのL列に◯と領収書番号を書き込む（領収書送付完了）
  */
 export async function markReceiptSent(
   rowIndex: number,
@@ -113,7 +113,7 @@ export async function markReceiptSent(
   const sheets = getSheets();
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!M${rowIndex}`,
+    range: `'${config.managementSheetName}'!L${rowIndex}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [[`◯ (${receiptNumber})`]],
