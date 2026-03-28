@@ -96,7 +96,8 @@ export async function generateReceiptPdf(
     font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   }
 
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  // 太字フォントがない場合は日本語フォントで代用
+  const fontBold = font;
   const now = new Date();
   const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
   const amount = deposit.amount;
@@ -106,7 +107,7 @@ export async function generateReceiptPdf(
 
   // タイトル
   page.drawText('領 収 書', {
-    x: 220, y, size: 28, font: fontBold, color: rgb(0, 0, 0),
+    x: 220, y, size: 28, font, color: rgb(0, 0, 0),
   });
   y -= 40;
 
