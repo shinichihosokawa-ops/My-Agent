@@ -23,7 +23,7 @@ export async function getMembers(): Promise<Member[]> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheetId,
-    range: 'フォームの回答 1!A2:G',  // ヘッダー行をスキップ
+    range: 'フォームの回答 1!A2:G',
   });
 
   const rows = res.data.values;
@@ -47,12 +47,10 @@ export async function getMembers(): Promise<Member[]> {
  */
 export async function markAsProcessed(
   memberEmail: string,
-  depositMessageId: string,
+  depositItemKey: string,
   receiptSentAt: string,
 ): Promise<void> {
   const sheets = getSheets();
-
-  // 「処理済み」シートが存在しない場合は作成
   await ensureProcessedSheet();
 
   await sheets.spreadsheets.values.append({
@@ -60,15 +58,15 @@ export async function markAsProcessed(
     range: '処理済み!A:D',
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: [[memberEmail, depositMessageId, new Date().toISOString(), receiptSentAt]],
+      values: [[memberEmail, depositItemKey, new Date().toISOString(), receiptSentAt]],
     },
   });
 }
 
 /**
- * 処理済みメールIDの一覧を取得
+ * 処理済み明細キーの一覧を取得（重複防止用）
  */
-export async function getProcessedMessageIds(): Promise<Set<string>> {
+export async function getProcessedItemKeys(): Promise<Set<string>> {
   const sheets = getSheets();
   try {
     const res = await sheets.spreadsheets.values.get({
@@ -97,23 +95,18 @@ async function ensureProcessedSheet(): Promise<void> {
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: config.spreadsheetId,
     requestBody: {
-      requests: [
-        {
-          addSheet: {
-            properties: { title: '処理済み' },
-          },
-        },
-      ],
+      requests: [{
+        addSheet: { properties: { title: '処理済み' } },
+      }],
     },
   });
 
-  // ヘッダー行を追加
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.spreadsheetId,
     range: '処理済み!A1:D1',
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: [['メールアドレス', '入金通知メッセージID', '照合日時', '領収書送信日時']],
+      values: [['メールアドレス', '明細キー', '照合日時', '領収書送信日時']],
     },
   });
 }

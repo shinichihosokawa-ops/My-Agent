@@ -1,13 +1,14 @@
 {
   "name": "membership-fee-system",
-  "version": "1.0.0",
-  "description": "会費徴収・照合・領収書自動発行システム",
+  "version": "2.0.0",
+  "description": "会費徴収・照合・領収書自動発行システム（GMOあおぞらネット銀行 + Google Cloud Functions）",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "npx ts-node src/index.ts",
-    "auth": "npx ts-node src/auth.ts"
+    "start": "npx functions-framework --target=webhookHandler --port=8080",
+    "dev": "npx functions-framework --target=webhookHandler --port=8080 --source=dist",
+    "auth": "npx ts-node src/auth.ts",
+    "deploy": "gcloud functions deploy membership-fee-webhook --runtime nodejs20 --trigger-http --allow-unauthenticated --entry-point webhookHandler --source=. --region=asia-northeast1"
   },
   "repository": {
     "type": "git",
@@ -17,6 +18,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google-cloud/functions-framework": "^5.0.2",
     "@types/node": "^25.5.0",
     "@types/nodemailer": "^7.0.11",
     "dotenv": "^17.3.1",

@@ -1,12 +1,12 @@
 /**
  * 領収書PDF生成
- * pdf-libを使用して日本語対応の領収書を生成
+ * pdf-libを使用して領収書を生成
  */
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
 import { config } from './config';
-import { Member, DepositNotification } from './types';
+import { Member, GmoDepositWebhook } from './types';
 
 /**
  * 領収書番号を生成（日付ベース + 連番）
@@ -18,16 +18,10 @@ export function generateReceiptNumber(): string {
   return `RCP-${dateStr}-${seq}`;
 }
 
-/**
- * 金額をフォーマット（例: 150000 → "¥150,000"）
- */
 function formatAmount(amount: number): string {
   return `¥${amount.toLocaleString('ja-JP')}`;
 }
 
-/**
- * 会員区分から但し書きの内訳テキストを生成
- */
 function getBreakdown(membershipType: string): string {
   for (const [key, fees] of Object.entries(config.membershipFees)) {
     if (membershipType.includes(key)) {
@@ -43,24 +37,18 @@ function getBreakdown(membershipType: string): string {
 /**
  * 領収書PDFを生成
  *
- * NOTE: pdf-libはStandardFonts（Helvetica等）のみ内蔵で、日本語グリフは描画できません。
- * 日本語テキストを表示するには、以下のいずれかの対応が必要です:
- *
- * 1. フォントファイルを埋め込む（推奨）:
- *    - NotoSansJP-Regular.ttf 等を fonts/ ディレクトリに配置
- *    - pdfDoc.embedFont(fs.readFileSync('fonts/NotoSansJP-Regular.ttf')) で読み込み
- *
- * 2. 下記コードは構造のテンプレートです。フォント埋め込み後に日本語が正しく表示されます。
+ * NOTE: 日本語表示にはフォントファイルの埋め込みが必要です。
+ * fonts/NotoSansJP-Regular.ttf を配置してください。
  */
 export async function generateReceiptPdf(
   member: Member,
-  deposit: DepositNotification,
+  deposit: GmoDepositWebhook,
   receiptNumber: string,
 ): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([595, 842]); // A4サイズ
+  const page = pdfDoc.addPage([595, 842]); // A4
 
-  // フォント読み込み（日本語フォントがあれば使用、なければフォールバック）
+  // フォント読み込み
   let font;
   const fontPath = path.join(__dirname, '..', 'fonts', 'NotoSansJP-Regular.ttf');
   if (fs.existsSync(fontPath)) {
@@ -74,9 +62,8 @@ export async function generateReceiptPdf(
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const now = new Date();
   const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
-  const amount = deposit.amount;
+  const amount = parseInt(deposit.depositAmount, 10);
 
-  // === レイアウト ===
   const margin = 50;
   let y = 780;
 
@@ -93,13 +80,14 @@ export async function generateReceiptPdf(
 
   // 宛名
   page.drawText(member.receiptAddress, { x: margin, y, size: 14, font });
-  page.drawText('様', { x: margin + font.widthOfTextAtSize(member.receiptAddress, 14) + 5, y, size: 14, font });
+  page.drawText('様', {
+    x: margin + font.widthOfTextAtSize(member.receiptAddress, 14) + 5,
+    y, size: 14, font,
+  });
   y -= 5;
   page.drawLine({
-    start: { x: margin, y },
-    end: { x: 300, y },
-    thickness: 1,
-    color: rgb(0, 0, 0),
+    start: { x: margin, y }, end: { x: 300, y },
+    thickness: 1, color: rgb(0, 0, 0),
   });
   y -= 35;
 
@@ -109,10 +97,8 @@ export async function generateReceiptPdf(
   });
   y -= 5;
   page.drawLine({
-    start: { x: margin, y },
-    end: { x: 350, y },
-    thickness: 2,
-    color: rgb(0, 0, 0),
+    start: { x: margin, y }, end: { x: 350, y },
+    thickness: 2, color: rgb(0, 0, 0),
   });
   y -= 35;
 
@@ -123,7 +109,7 @@ export async function generateReceiptPdf(
   });
   y -= 40;
 
-  // 内訳テーブル
+  // 内訳
   for (const [key, fees] of Object.entries(config.membershipFees)) {
     if (member.membershipType.includes(key)) {
       if (fees.admissionFee > 0) {
@@ -153,7 +139,9 @@ export async function generateReceiptPdf(
   page.drawText(`TEL: ${config.issuer.tel}`, { x: 350, y, size: 9, font });
   y -= 15;
   if (config.issuer.registrationNumber) {
-    page.drawText(`登録番号: ${config.issuer.registrationNumber}`, { x: 350, y, size: 9, font });
+    page.drawText(`登録番号: ${config.issuer.registrationNumber}`, {
+      x: 350, y, size: 9, font,
+    });
   }
 
   const pdfBytes = await pdfDoc.save();

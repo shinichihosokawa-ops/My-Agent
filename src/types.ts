@@ -9,19 +9,30 @@ export interface Member {
   expectedDate: string;      // 振込予定日
 }
 
-/** SMBC入金通知メールから抽出した情報 */
-export interface DepositNotification {
-  messageId: string;
-  date: string;
-  depositorName: string;     // 振込人名（カタカナ）
-  amount: number;            // 入金額
-  rawBody: string;
+/**
+ * GMOあおぞらネット銀行 Webhook入金通知ペイロード
+ * 振込入金口座の入金明細通知
+ */
+export interface GmoDepositWebhook {
+  vaId: string;                // 振込入金口座ID
+  transactionDate: string;     // 取引日（YYYY-MM-DD）
+  valueDate: string;           // 起算日（YYYY-MM-DD）
+  vaBranchCode: string;        // 支店コード
+  vaBranchNameKana: string;    // 支店名カナ
+  vaAccountNumber: string;     // 口座番号
+  vaAccountNameKana: string;   // 口座名義カナ
+  depositAmount: string;       // 入金金額（文字列）
+  remitterNameKana: string;    // 振込依頼人名カナ（半角カナ）
+  paymentBankName: string;     // 仕向金融機関名カナ
+  paymentBranchName: string;   // 仕向支店名カナ
+  itemKey: string;             // 明細キー（ユニークID）
+  remarks?: string;            // 摘要
 }
 
 /** 照合結果 */
 export interface MatchResult {
   member: Member;
-  deposit: DepositNotification;
+  deposit: GmoDepositWebhook;
   confidence: 'high' | 'medium' | 'low';
   nameMatch: boolean;
   amountMatch: boolean;
@@ -30,7 +41,7 @@ export interface MatchResult {
 /** 処理済み記録（Sheetsに書き戻す） */
 export interface ProcessedRecord {
   memberEmail: string;
-  depositMessageId: string;
+  depositItemKey: string;
   matchedAt: string;
   receiptSentAt: string;
 }
