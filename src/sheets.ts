@@ -1,7 +1,7 @@
 /**
  * Google Sheets API 連携
  * - Form Responses 1: フォーム回答（会員データ）の読み取り
- * - 顧客管理データ: 入金確認（K列）・入金日（L列）・領収書送付完了（M列）の読み書き
+ * - 顧客管理データ: 入金日（L列）・領収書送付完了（M列）の読み書き
  * - 処理済み: 処理済み記録
  */
 import { google, sheets_v4 } from 'googleapis';
@@ -20,17 +20,17 @@ function getSheets(): sheets_v4.Sheets {
 
 /**
  * 会員データを取得
- * - Form Responses 1 (A〜I列) から会員情報を読み取り
- * - 顧客管理データ (K〜L列) から入金確認・入金日を読み取り
+ * - Form Responses 1 (A〜K列) から会員情報を読み取り
+ * - 顧客管理データ (L〜M列) から入金日・領収書送付完了を読み取り
  * - 行番号で結合して返す
  */
 export async function getMembers(): Promise<Member[]> {
   const sheets = getSheets();
 
-  // フォーム回答から会員データを取得（A〜I列）
+  // フォーム回答から会員データを取得（A〜K列）
   const formRes = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.formSheetName}'!A2:I`,
+    range: `'${config.formSheetName}'!A2:K`,
   });
 
   const rows = formRes.data.values;
@@ -38,10 +38,10 @@ export async function getMembers(): Promise<Member[]> {
     return [];
   }
 
-  // 顧客管理データから入金確認・入金日・領収書送付完了を取得（J〜L列）
+  // 顧客管理データから入金日・領収書送付完了を取得（L〜M列）
   const paymentRes = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!J2:L`,
+    range: `'${config.managementSheetName}'!L2:M`,
   });
   const paymentRows = paymentRes.data.values || [];
 
@@ -56,37 +56,38 @@ export async function getMembers(): Promise<Member[]> {
     expectedDate: row[6] || '',           // G列: 振込予定日
     forumParticipation: row[7] || '',     // H列: フォーラム参加希望
     mentoringParticipation: row[8] || '', // I列: メンタリング参加希望
-    paymentConfirmed: paymentRows[index]?.[0] || '',  // 顧客管理データ J列: 入金確認
-    paymentDate: paymentRows[index]?.[1] || '',        // 顧客管理データ K列: 入金日
-    receiptSent: paymentRows[index]?.[2] || '',        // 顧客管理データ L列: 領収書送付完了
+    companyName: row[9] || '',            // J列: 御社名（学生の場合は学校名）
+    facebookUrl: row[10] || '',           // K列: FacebookアカウントURL
+    paymentDate: paymentRows[index]?.[0] || '',   // 顧客管理データ L列: 入金日
+    receiptSent: paymentRows[index]?.[1] || '',    // 顧客管理データ M列: 領収書送付完了
   }));
 }
 
 /**
- * 顧客管理データのJ〜L列のヘッダーが未設定なら書き込む（初回実行時のみ）
+ * 顧客管理データのL〜M列のヘッダーが未設定なら書き込む（初回実行時のみ）
  */
 export async function ensurePaymentHeaders(): Promise<void> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!J1:L1`,
+    range: `'${config.managementSheetName}'!L1:M1`,
   });
 
   const headers = res.data.values?.[0] || [];
-  if (headers[0] === '入金確認' && headers[1] === '入金日' && headers[2] === '領収書送付完了') return;
+  if (headers[0] === '入金日' && headers[1] === '領収書送付完了') return;
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!J1:L1`,
+    range: `'${config.managementSheetName}'!L1:M1`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: [['入金確認', '入金日', '領収書送付完了']],
+      values: [['入金日', '領収書送付完了']],
     },
   });
 }
 
 /**
- * 顧客管理データのJ列に◯、K列に入金日を書き込む
+ * 顧客管理データのL列に入金日を書き込む
  */
 export async function markPaymentConfirmed(
   rowIndex: number,
@@ -95,16 +96,16 @@ export async function markPaymentConfirmed(
   const sheets = getSheets();
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!J${rowIndex}:K${rowIndex}`,
+    range: `'${config.managementSheetName}'!L${rowIndex}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: [['◯', paymentDate]],
+      values: [[paymentDate]],
     },
   });
 }
 
 /**
- * 顧客管理データのL列に◯と領収書番号を書き込む（領収書送付完了）
+ * 顧客管理データのM列に◯と領収書番号を書き込む（領収書送付完了）
  */
 export async function markReceiptSent(
   rowIndex: number,
@@ -113,7 +114,7 @@ export async function markReceiptSent(
   const sheets = getSheets();
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!L${rowIndex}`,
+    range: `'${config.managementSheetName}'!M${rowIndex}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [[`◯ (${receiptNumber})`]],

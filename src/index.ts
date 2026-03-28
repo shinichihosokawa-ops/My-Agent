@@ -42,10 +42,10 @@ async function processOnce(): Promise<string[]> {
 
   // ========================================
   // A. 手動確認分の領収書送信
-  //    J列◯ + K列入金日あり + L列空 → 領収書送信
+  //    L列入金日あり + M列空 → 領収書送信
   // ========================================
   const manualConfirmed = allMembers.filter(
-    (m) => m.paymentConfirmed === '◯' && m.paymentDate && !m.receiptSent.startsWith('◯'),
+    (m) => m.paymentDate && !m.receiptSent.startsWith('◯'),
   );
 
   if (manualConfirmed.length > 0) {
@@ -98,8 +98,8 @@ async function processOnce(): Promise<string[]> {
 
   const processedRefs = await getProcessedRefs();
 
-  // 入金確認済み or 領収書送付済みの会員はスクショ処理対象外
-  const members = allMembers.filter((m) => m.paymentConfirmed !== '◯' && !m.receiptSent.startsWith('◯'));
+  // 入金日あり or 領収書送付済みの会員はスクショ処理対象外
+  const members = allMembers.filter((m) => !m.paymentDate && !m.receiptSent.startsWith('◯'));
   log(`スクショ照合対象: ${members.length}件 / 処理済み: ${processedRefs.size}件`);
 
   for (const screenshot of screenshots) {

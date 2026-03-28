@@ -19,8 +19,9 @@ async function main() {
     expectedDate: '2026/03/29',
     forumParticipation: '',
     mentoringParticipation: '',
-    paymentConfirmed: '',
-    paymentDate: '',
+    companyName: '株式会社HOSOKAWA',
+    facebookUrl: '',
+    paymentDate: '2026/03/28',
     receiptSent: '',
   };
 
