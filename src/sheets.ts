@@ -48,6 +48,29 @@ export async function getMembers(): Promise<Member[]> {
 }
 
 /**
+ * J列・K列のヘッダーが未設定なら書き込む（初回実行時のみ）
+ */
+export async function ensurePaymentHeaders(): Promise<void> {
+  const sheets = getSheets();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: config.spreadsheetId,
+    range: 'フォームの回答 1!J1:K1',
+  });
+
+  const headers = res.data.values?.[0] || [];
+  if (headers[0] === '入金確認' && headers[1] === '入金日') return;
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: config.spreadsheetId,
+    range: 'フォームの回答 1!J1:K1',
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [['入金確認', '入金日']],
+    },
+  });
+}
+
+/**
  * J列に◯、K列に入金日を書き込む
  */
 export async function markPaymentConfirmed(

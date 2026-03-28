@@ -11,7 +11,7 @@
 import { HttpFunction } from '@google-cloud/functions-framework';
 import { getScreenshots, moveToProcessed } from './drive';
 import { parseScreenshot } from './screenshot-parser';
-import { getMembers, getProcessedRefs, markAsProcessed, markPaymentConfirmed } from './sheets';
+import { getMembers, getProcessedRefs, markAsProcessed, markPaymentConfirmed, ensurePaymentHeaders } from './sheets';
 import { matchDeposits } from './matcher';
 import { generateReceiptPdf, generateReceiptNumber } from './receipt';
 import { sendReceiptEmail } from './gmail';
@@ -21,6 +21,9 @@ async function processOnce(): Promise<string[]> {
   const log = (msg: string) => { console.log(msg); logs.push(msg); };
 
   log(`[${new Date().toISOString()}] 処理開始...`);
+
+  // 0. J列・K列のヘッダーを確認（初回のみ書き込み）
+  await ensurePaymentHeaders();
 
   // 1. Google Driveからスクショを取得
   const screenshots = await getScreenshots();
