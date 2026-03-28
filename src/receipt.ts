@@ -73,18 +73,27 @@ export async function generateReceiptPdf(
   receiptNumber: string,
 ): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
-  pdfDoc.registerFontkit(fontkit);
   const page = pdfDoc.addPage([595, 842]); // A4
 
   // フォント読み込み
   let font;
-  const fontPath = path.join(__dirname, '..', 'fonts', 'NotoSansJP-Regular.ttf');
-  if (fs.existsSync(fontPath)) {
+  // ts-nodeでは__dirnameがsrc/、ビルド後はdist/を指すのでどちらでも探す
+  const fontPaths = [
+    path.join(__dirname, '..', 'fonts', 'NotoSansJP-Regular.ttf'),
+    path.join(process.cwd(), 'fonts', 'NotoSansJP-Regular.ttf'),
+  ];
+  const fontPath = fontPaths.find((p) => fs.existsSync(p));
+
+  if (fontPath) {
+    console.log(`フォント読み込み: ${fontPath}`);
+    console.log(`fontkit type: ${typeof fontkit}, keys: ${Object.keys(fontkit || {}).join(', ')}`);
+    pdfDoc.registerFontkit(fontkit);
     const fontBytes = fs.readFileSync(fontPath);
     font = await pdfDoc.embedFont(fontBytes);
   } else {
+    console.warn(`警告: 日本語フォントが見つかりません。探したパス:`);
+    fontPaths.forEach((p) => console.warn(`  ${p}`));
     font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    console.warn('警告: 日本語フォントが見つかりません。fonts/NotoSansJP-Regular.ttf を配置してください。');
   }
 
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
