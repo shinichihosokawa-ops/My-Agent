@@ -11,7 +11,7 @@
 import { HttpFunction } from '@google-cloud/functions-framework';
 import { getScreenshots, moveToProcessed } from './drive';
 import { parseScreenshot } from './screenshot-parser';
-import { getMembers, getProcessedRefs, markAsProcessed, markPaymentConfirmed, ensurePaymentHeaders } from './sheets';
+import { getMembers, getProcessedRefs, markAsProcessed, markPaymentConfirmed, markReceiptSent, ensurePaymentHeaders } from './sheets';
 import { matchDeposits } from './matcher';
 import { generateReceiptPdf, generateReceiptNumber } from './receipt';
 import { sendReceiptEmail } from './gmail';
@@ -37,10 +37,11 @@ async function processOnce(): Promise<string[]> {
   const allMembers = await getMembers();
   const processedRefs = await getProcessedRefs();
 
-  // 手作業で入金確認済み（H列に◯）の会員はスクショ処理対象外
-  const members = allMembers.filter((m) => m.paymentConfirmed !== '◯');
-  const confirmedCount = allMembers.length - members.length;
-  log(`会員台帳: ${allMembers.length}件（入金確認済み: ${confirmedCount}件、未確認: ${members.length}件） / 処理済み: ${processedRefs.size}件`);
+  // 入金確認済み or 領収書送付済みの会員はスクショ処理対象外
+  const members = allMembers.filter((m) => m.paymentConfirmed !== '◯' && !m.receiptSent.startsWith('◯'));
+  const confirmedCount = allMembers.filter((m) => m.paymentConfirmed === '◯').length;
+  const receiptSentCount = allMembers.filter((m) => m.receiptSent.startsWith('◯')).length;
+  log(`会員台帳: ${allMembers.length}件（入金確認済み: ${confirmedCount}件、領収書送付済み: ${receiptSentCount}件、未処理: ${members.length}件） / 処理済み: ${processedRefs.size}件`);
 
   // 3. 各スクショを処理
   for (const screenshot of screenshots) {
@@ -83,9 +84,12 @@ async function processOnce(): Promise<string[]> {
           receiptNumber,
         );
 
+        // M列に領収書送付完了を記録
+        await markReceiptSent(match.member.rowIndex, receiptNumber);
+
         processedRefs.add(match.deposit.referenceNumber);
         log(`  [SENT] 領収書送信: ${match.member.email} (${receiptNumber})`);
-        log(`  [SHEET] 顧客管理データ K列◯・L列${match.deposit.date}を記録 (行${match.member.rowIndex})`);
+        log(`  [SHEET] K列◯・L列${match.deposit.date}・M列領収書送付完了を記録 (行${match.member.rowIndex})`);
 
       } else if (match.confidence === 'medium') {
         log(`  [WARN] 名前一致・金額不一致: ${match.member.name}`);

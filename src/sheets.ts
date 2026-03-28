@@ -1,7 +1,7 @@
 /**
  * Google Sheets API 連携
  * - Form Responses 1: フォーム回答（会員データ）の読み取り
- * - 顧客管理データ: 入金確認（K列）・入金日（L列）の読み書き
+ * - 顧客管理データ: 入金確認（K列）・入金日（L列）・領収書送付完了（M列）の読み書き
  * - 処理済み: 処理済み記録
  */
 import { google, sheets_v4 } from 'googleapis';
@@ -38,10 +38,10 @@ export async function getMembers(): Promise<Member[]> {
     return [];
   }
 
-  // 顧客管理データから入金確認・入金日を取得（K〜L列）
+  // 顧客管理データから入金確認・入金日・領収書送付完了を取得（K〜M列）
   const paymentRes = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!K2:L`,
+    range: `'${config.managementSheetName}'!K2:M`,
   });
   const paymentRows = paymentRes.data.values || [];
 
@@ -58,28 +58,29 @@ export async function getMembers(): Promise<Member[]> {
     mentoringParticipation: row[8] || '', // I列: メンタリング参加希望
     paymentConfirmed: paymentRows[index]?.[0] || '',  // 顧客管理データ K列: 入金確認
     paymentDate: paymentRows[index]?.[1] || '',        // 顧客管理データ L列: 入金日
+    receiptSent: paymentRows[index]?.[2] || '',        // 顧客管理データ M列: 領収書送付完了
   }));
 }
 
 /**
- * 顧客管理データのK列・L列のヘッダーが未設定なら書き込む（初回実行時のみ）
+ * 顧客管理データのK〜M列のヘッダーが未設定なら書き込む（初回実行時のみ）
  */
 export async function ensurePaymentHeaders(): Promise<void> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!K1:L1`,
+    range: `'${config.managementSheetName}'!K1:M1`,
   });
 
   const headers = res.data.values?.[0] || [];
-  if (headers[0] === '入金確認' && headers[1] === '入金日') return;
+  if (headers[0] === '入金確認' && headers[1] === '入金日' && headers[2] === '領収書送付完了') return;
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.spreadsheetId,
-    range: `'${config.managementSheetName}'!K1:L1`,
+    range: `'${config.managementSheetName}'!K1:M1`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: [['入金確認', '入金日']],
+      values: [['入金確認', '入金日', '領収書送付完了']],
     },
   });
 }
@@ -98,6 +99,24 @@ export async function markPaymentConfirmed(
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [['◯', paymentDate]],
+    },
+  });
+}
+
+/**
+ * 顧客管理データのM列に◯と領収書番号を書き込む（領収書送付完了）
+ */
+export async function markReceiptSent(
+  rowIndex: number,
+  receiptNumber: string,
+): Promise<void> {
+  const sheets = getSheets();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: config.spreadsheetId,
+    range: `'${config.managementSheetName}'!M${rowIndex}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [[`◯ (${receiptNumber})`]],
     },
   });
 }

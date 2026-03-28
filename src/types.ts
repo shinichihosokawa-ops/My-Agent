@@ -10,8 +10,9 @@ export interface Member {
   expectedDate: string;        // G列: 振込予定日
   forumParticipation: string;  // H列: フォーラム参加希望
   mentoringParticipation: string; // I列: メンタリング参加希望
-  paymentConfirmed: string;    // J列: 入金確認（◯ = 確認済み）
-  paymentDate: string;         // K列: 入金日
+  paymentConfirmed: string;    // 顧客管理データ K列: 入金確認（◯ = 確認済み）
+  paymentDate: string;         // 顧客管理データ L列: 入金日
+  receiptSent: string;         // 顧客管理データ M列: 領収書送付完了（◯ = 送付済み）
 }
 
 /** スクリーンショットから抽出した入金明細1件 */
