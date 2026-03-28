@@ -2,11 +2,8 @@
  * 会費徴収・照合・領収書自動発行システム
  *
  * フロー:
- * 1. Google Driveの指定フォルダからスクショ画像を取得
- * 2. Claude APIで画像解析 → 入金明細を抽出
- * 3. Sheets会員台帳と照合（カナ名 + 金額）
- * 4. 照合OKなら領収書PDF生成 → メール送信
- * 5. 処理済みとしてSheetsに記録、画像を「処理済み」フォルダに移動
+ * A. 手動確認分: J列◯ + K列入金日あり + L列空 → 領収書生成・メール送信
+ * B. スクショ分: Google Drive → Claude解析 → 照合 → 領収書生成・メール送信
  */
 import { HttpFunction } from '@google-cloud/functions-framework';
 import { getScreenshots, moveToProcessed } from './drive';
@@ -15,6 +12,20 @@ import { getMembers, getProcessedRefs, markAsProcessed, markPaymentConfirmed, ma
 import { matchDeposits } from './matcher';
 import { generateReceiptPdf, generateReceiptNumber } from './receipt';
 import { sendReceiptEmail } from './gmail';
+import { Member, DepositEntry } from './types';
+import { config } from './config';
+
+/**
+ * 会員区分テキストから金額を取得
+ */
+function getExpectedAmount(membershipType: string): number | null {
+  for (const [key, fees] of Object.entries(config.membershipFees)) {
+    if (membershipType.includes(key)) {
+      return fees.total;
+    }
+  }
+  return null;
+}
 
 async function processOnce(): Promise<string[]> {
   const logs: string[] = [];
@@ -22,28 +33,75 @@ async function processOnce(): Promise<string[]> {
 
   log(`[${new Date().toISOString()}] 処理開始...`);
 
-  // 0. J列・K列のヘッダーを確認（初回のみ書き込み）
+  // 0. ヘッダーを確認（初回のみ書き込み）
   await ensurePaymentHeaders();
 
-  // 1. Google Driveからスクショを取得
+  // 1. 全会員データを取得
+  const allMembers = await getMembers();
+  log(`会員台帳: ${allMembers.length}件`);
+
+  // ========================================
+  // A. 手動確認分の領収書送信
+  //    J列◯ + K列入金日あり + L列空 → 領収書送信
+  // ========================================
+  const manualConfirmed = allMembers.filter(
+    (m) => m.paymentConfirmed === '◯' && m.paymentDate && !m.receiptSent.startsWith('◯'),
+  );
+
+  if (manualConfirmed.length > 0) {
+    log(`\n--- 手動確認分の領収書送信: ${manualConfirmed.length}件 ---`);
+
+    for (const member of manualConfirmed) {
+      const amount = getExpectedAmount(member.membershipType);
+      if (!amount) {
+        log(`  [SKIP] ${member.name}: 会員区分から金額を特定できません`);
+        continue;
+      }
+
+      // 入金データを手動確認情報から構築
+      const deposit: DepositEntry = {
+        date: member.paymentDate,
+        depositorName: member.transferName,
+        amount,
+        referenceNumber: `MANUAL-${member.rowIndex}`,
+      };
+
+      const receiptNumber = generateReceiptNumber();
+      log(`  [OK] ${member.name} → ¥${amount.toLocaleString()} (入金日: ${member.paymentDate})`);
+
+      const receiptPdf = await generateReceiptPdf(member, deposit, receiptNumber, member.paymentDate);
+
+      await sendReceiptEmail(
+        member.email,
+        member.name,
+        receiptPdf,
+        receiptNumber,
+      );
+
+      await markReceiptSent(member.rowIndex, receiptNumber);
+      log(`  [SENT] 領収書送信: ${member.email} (${receiptNumber})`);
+    }
+  } else {
+    log('手動確認分の未送信はありません。');
+  }
+
+  // ========================================
+  // B. スクショ方式の処理
+  // ========================================
   const screenshots = await getScreenshots();
   if (screenshots.length === 0) {
     log('新しいスクショはありません。');
+    log(`\n[${new Date().toISOString()}] 処理完了`);
     return logs;
   }
-  log(`スクショ: ${screenshots.length}件検出`);
+  log(`\nスクショ: ${screenshots.length}件検出`);
 
-  // 2. 会員台帳と処理済み情報を取得
-  const allMembers = await getMembers();
   const processedRefs = await getProcessedRefs();
 
   // 入金確認済み or 領収書送付済みの会員はスクショ処理対象外
   const members = allMembers.filter((m) => m.paymentConfirmed !== '◯' && !m.receiptSent.startsWith('◯'));
-  const confirmedCount = allMembers.filter((m) => m.paymentConfirmed === '◯').length;
-  const receiptSentCount = allMembers.filter((m) => m.receiptSent.startsWith('◯')).length;
-  log(`会員台帳: ${allMembers.length}件（入金確認済み: ${confirmedCount}件、領収書送付済み: ${receiptSentCount}件、未処理: ${members.length}件） / 処理済み: ${processedRefs.size}件`);
+  log(`スクショ照合対象: ${members.length}件 / 処理済み: ${processedRefs.size}件`);
 
-  // 3. 各スクショを処理
   for (const screenshot of screenshots) {
     log(`\n--- ${screenshot.name} を処理中 ---`);
 
@@ -66,7 +124,7 @@ async function processOnce(): Promise<string[]> {
         log(`  [OK] ${match.member.name} (${match.deposit.depositorName}) → ¥${match.deposit.amount.toLocaleString()}`);
 
         const receiptNumber = generateReceiptNumber();
-        const receiptPdf = await generateReceiptPdf(match.member, match.deposit, receiptNumber);
+        const receiptPdf = await generateReceiptPdf(match.member, match.deposit, receiptNumber, match.deposit.date);
 
         await sendReceiptEmail(
           match.member.email,
@@ -75,7 +133,6 @@ async function processOnce(): Promise<string[]> {
           receiptNumber,
         );
 
-        // H列に◯、I列に入金日を書き込む
         await markPaymentConfirmed(match.member.rowIndex, match.deposit.date);
 
         await markAsProcessed(
@@ -84,12 +141,10 @@ async function processOnce(): Promise<string[]> {
           receiptNumber,
         );
 
-        // M列に領収書送付完了を記録
         await markReceiptSent(match.member.rowIndex, receiptNumber);
 
         processedRefs.add(match.deposit.referenceNumber);
         log(`  [SENT] 領収書送信: ${match.member.email} (${receiptNumber})`);
-        log(`  [SHEET] J列◯・K列${match.deposit.date}・L列領収書送付完了を記録 (行${match.member.rowIndex})`);
 
       } else if (match.confidence === 'medium') {
         log(`  [WARN] 名前一致・金額不一致: ${match.member.name}`);
@@ -120,7 +175,6 @@ async function processOnce(): Promise<string[]> {
 
 /**
  * Cloud Functions HTTPエントリーポイント
- * Cloud Schedulerから定期呼び出し、または手動トリガー
  */
 export const processScreenshots: HttpFunction = async (_req, res) => {
   try {

@@ -71,6 +71,7 @@ export async function generateReceiptPdf(
   member: Member,
   deposit: DepositEntry,
   receiptNumber: string,
+  overrideDate?: string,
 ): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([595, 842]); // A4
@@ -98,8 +99,22 @@ export async function generateReceiptPdf(
 
   // 太字フォントがない場合は日本語フォントで代用
   const fontBold = font;
-  const now = new Date();
-  const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
+
+  // 領収書の日付：overrideDateがあればそれを使用（入金日）、なければ今日
+  let dateStr: string;
+  if (overrideDate) {
+    // "2026/3/28" や "3/28/2026" などの形式をパース
+    const d = new Date(overrideDate);
+    if (!isNaN(d.getTime())) {
+      dateStr = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    } else {
+      // パースできない場合はそのまま使用
+      dateStr = overrideDate;
+    }
+  } else {
+    const now = new Date();
+    dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
+  }
   const amount = deposit.amount;
 
   const margin = 50;
