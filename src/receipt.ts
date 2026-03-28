@@ -4,7 +4,7 @@
  */
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const fontkit = require('@pdf-lib/fontkit');
+const fontkit = require('@pdf-lib/fontkit').default;
 import fs from 'fs';
 import path from 'path';
 import { config } from './config';
