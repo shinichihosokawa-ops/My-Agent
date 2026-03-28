@@ -22,13 +22,30 @@ function formatAmount(amount: number): string {
   return `¥${amount.toLocaleString('ja-JP')}`;
 }
 
+/**
+ * 年会費の対象期間を算出（入金月の翌月から1年間）
+ */
+function getAnnualFeePeriod(): string {
+  const now = new Date();
+  const startYear = now.getFullYear();
+  const startMonth = now.getMonth() + 2; // 翌月（0-indexed +1 で今月、+2で翌月）
+  const start = startMonth > 12
+    ? `${startYear + 1}年1月`
+    : `${startYear}年${startMonth}月`;
+  const endMonth = startMonth > 12 ? 1 : startMonth;
+  const endYear = startMonth > 12 ? startYear + 2 : startYear + 1;
+  const end = `${endYear}年${endMonth}月`;
+  return `${start}〜${end}`;
+}
+
 function getBreakdown(membershipType: string): string {
+  const period = getAnnualFeePeriod();
   for (const [key, fees] of Object.entries(config.membershipFees)) {
     if (membershipType.includes(key)) {
       if (fees.admissionFee === 0) {
-        return `${key} 年会費 ${formatAmount(fees.annualFee)}`;
+        return `${key} 年会費 ${formatAmount(fees.annualFee)}（${period}分）`;
       }
-      return `${key} 入会金 ${formatAmount(fees.admissionFee)} + 年会費 ${formatAmount(fees.annualFee)}`;
+      return `${key} 入会金 ${formatAmount(fees.admissionFee)} + 年会費 ${formatAmount(fees.annualFee)}（${period}分）`;
     }
   }
   return '';
@@ -118,7 +135,8 @@ export async function generateReceiptPdf(
         });
         y -= 20;
       }
-      page.drawText(`年会費: ${formatAmount(fees.annualFee)}`, {
+      const period = getAnnualFeePeriod();
+      page.drawText(`年会費: ${formatAmount(fees.annualFee)}（${period}分）`, {
         x: margin + 20, y, size: 10, font,
       });
       y -= 20;
