@@ -1,6 +1,6 @@
 /**
  * Google Sheets API 連携
- * フォーム回答（会員台帳）の読み取り・処理済みフラグ書き込み
+ * フォーム回答（会員台帳）の読み取り・入金確認書き込み・処理済み記録
  */
 import { google, sheets_v4 } from 'googleapis';
 import { createOAuth2Client } from './auth';
@@ -17,13 +17,13 @@ function getSheets(): sheets_v4.Sheets {
 }
 
 /**
- * フォーム回答シートから全会員データを取得
+ * フォーム回答シートから全会員データを取得（H列・I列含む）
  */
 export async function getMembers(): Promise<Member[]> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheetId,
-    range: 'フォームの回答 1!A2:G',
+    range: 'フォームの回答 1!A2:I',
   });
 
   const rows = res.data.values;
@@ -31,7 +31,8 @@ export async function getMembers(): Promise<Member[]> {
     return [];
   }
 
-  return rows.map((row) => ({
+  return rows.map((row, index) => ({
+    rowIndex: index + 2,  // ヘッダーが1行目なので、データは2行目から
     timestamp: row[0] || '',
     email: row[1] || '',
     name: row[2] || '',
@@ -39,7 +40,27 @@ export async function getMembers(): Promise<Member[]> {
     receiptAddress: row[4] || '',
     membershipType: row[5] || '',
     expectedDate: row[6] || '',
+    paymentConfirmed: row[7] || '',  // H列
+    paymentDate: row[8] || '',       // I列
   }));
+}
+
+/**
+ * H列に◯、I列に入金日を書き込む
+ */
+export async function markPaymentConfirmed(
+  rowIndex: number,
+  paymentDate: string,
+): Promise<void> {
+  const sheets = getSheets();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: config.spreadsheetId,
+    range: `フォームの回答 1!H${rowIndex}:I${rowIndex}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [['◯', paymentDate]],
+    },
+  });
 }
 
 /**

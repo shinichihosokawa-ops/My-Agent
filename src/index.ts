@@ -11,7 +11,7 @@
 import { HttpFunction } from '@google-cloud/functions-framework';
 import { getScreenshots, moveToProcessed } from './drive';
 import { parseScreenshot } from './screenshot-parser';
-import { getMembers, getProcessedRefs, markAsProcessed } from './sheets';
+import { getMembers, getProcessedRefs, markAsProcessed, markPaymentConfirmed } from './sheets';
 import { matchDeposits } from './matcher';
 import { generateReceiptPdf, generateReceiptNumber } from './receipt';
 import { sendReceiptEmail } from './gmail';
@@ -31,9 +31,13 @@ async function processOnce(): Promise<string[]> {
   log(`スクショ: ${screenshots.length}件検出`);
 
   // 2. 会員台帳と処理済み情報を取得
-  const members = await getMembers();
+  const allMembers = await getMembers();
   const processedRefs = await getProcessedRefs();
-  log(`会員台帳: ${members.length}件 / 処理済み: ${processedRefs.size}件`);
+
+  // 手作業で入金確認済み（H列に◯）の会員はスクショ処理対象外
+  const members = allMembers.filter((m) => m.paymentConfirmed !== '◯');
+  const confirmedCount = allMembers.length - members.length;
+  log(`会員台帳: ${allMembers.length}件（入金確認済み: ${confirmedCount}件、未確認: ${members.length}件） / 処理済み: ${processedRefs.size}件`);
 
   // 3. 各スクショを処理
   for (const screenshot of screenshots) {
@@ -67,6 +71,9 @@ async function processOnce(): Promise<string[]> {
           receiptNumber,
         );
 
+        // H列に◯、I列に入金日を書き込む
+        await markPaymentConfirmed(match.member.rowIndex, match.deposit.date);
+
         await markAsProcessed(
           match.member.email,
           match.deposit.referenceNumber,
@@ -75,6 +82,7 @@ async function processOnce(): Promise<string[]> {
 
         processedRefs.add(match.deposit.referenceNumber);
         log(`  [SENT] 領収書送信: ${match.member.email} (${receiptNumber})`);
+        log(`  [SHEET] H列◯・I列${match.deposit.date}を記録 (行${match.member.rowIndex})`);
 
       } else if (match.confidence === 'medium') {
         log(`  [WARN] 名前一致・金額不一致: ${match.member.name}`);
