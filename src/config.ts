@@ -13,12 +13,11 @@ export const config = {
   // Google SheetsのスプレッドシートID
   spreadsheetId: process.env.SPREADSHEET_ID!,
 
-  // GMOあおぞらネット銀行 API
-  gmoAozora: {
-    clientId: process.env.GMO_CLIENT_ID!,
-    clientSecret: process.env.GMO_CLIENT_SECRET!,
-    webhookSecret: process.env.GMO_WEBHOOK_SECRET || '',
-  },
+  // Google DriveのフォルダID（スクショ投入先）
+  driveFolderId: process.env.DRIVE_FOLDER_ID!,
+
+  // Claude API
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY!,
 
   // 領収書の発行者情報
   issuer: {

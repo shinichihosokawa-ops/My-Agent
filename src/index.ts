@@ -1,104 +1,131 @@
 /**
  * 会費徴収・照合・領収書自動発行システム
- * Google Cloud Functions エントリーポイント
  *
- * GMOあおぞらネット銀行のWebhookで入金通知を受信し、
- * Google Sheets会員台帳と照合 → 領収書PDF生成 → メール送信
+ * フロー:
+ * 1. Google Driveの指定フォルダからスクショ画像を取得
+ * 2. Claude APIで画像解析 → 入金明細を抽出
+ * 3. Sheets会員台帳と照合（カナ名 + 金額）
+ * 4. 照合OKなら領収書PDF生成 → メール送信
+ * 5. 処理済みとしてSheetsに記録、画像を「処理済み」フォルダに移動
  */
 import { HttpFunction } from '@google-cloud/functions-framework';
-import { config } from './config';
-import { getMembers, getProcessedItemKeys, markAsProcessed } from './sheets';
-import { sendReceiptEmail } from './gmail';
-import { matchDeposit } from './matcher';
+import { getScreenshots, moveToProcessed } from './drive';
+import { parseScreenshot } from './screenshot-parser';
+import { getMembers, getProcessedRefs, markAsProcessed } from './sheets';
+import { matchDeposits } from './matcher';
 import { generateReceiptPdf, generateReceiptNumber } from './receipt';
-import { verifyWebhookSignature } from './webhook';
-import { GmoDepositWebhook } from './types';
+import { sendReceiptEmail } from './gmail';
 
-/**
- * Webhook受信ハンドラ（Cloud Functions エントリーポイント）
- *
- * GMOあおぞらネット銀行から入金発生時にPOSTされる
- */
-export const webhookHandler: HttpFunction = async (req, res) => {
-  // POSTのみ受け付け
-  if (req.method !== 'POST') {
-    res.status(405).send('Method Not Allowed');
-    return;
+async function processOnce(): Promise<string[]> {
+  const logs: string[] = [];
+  const log = (msg: string) => { console.log(msg); logs.push(msg); };
+
+  log(`[${new Date().toISOString()}] 処理開始...`);
+
+  // 1. Google Driveからスクショを取得
+  const screenshots = await getScreenshots();
+  if (screenshots.length === 0) {
+    log('新しいスクショはありません。');
+    return logs;
   }
+  log(`スクショ: ${screenshots.length}件検出`);
 
-  try {
-    // 署名検証
-    const signature = req.headers['x-hmac-signature'] as string || '';
-    const rawBody = JSON.stringify(req.body);
+  // 2. 会員台帳と処理済み情報を取得
+  const members = await getMembers();
+  const processedRefs = await getProcessedRefs();
+  log(`会員台帳: ${members.length}件 / 処理済み: ${processedRefs.size}件`);
 
-    if (config.gmoAozora.webhookSecret && !verifyWebhookSignature(rawBody, signature)) {
-      console.error('Webhook署名検証失敗');
-      res.status(401).send('Unauthorized');
-      return;
+  // 3. 各スクショを処理
+  for (const screenshot of screenshots) {
+    log(`\n--- ${screenshot.name} を処理中 ---`);
+
+    // Claude APIで画像解析
+    const deposits = await parseScreenshot(screenshot.base64, screenshot.mimeType);
+    if (deposits.length === 0) {
+      log(`  入金データなし。スキップします。`);
+      await moveToProcessed(screenshot.fileId);
+      continue;
     }
-
-    const deposit: GmoDepositWebhook = req.body;
-    console.log(`入金通知受信: ${deposit.remitterNameKana} / ¥${deposit.depositAmount} / ${deposit.transactionDate}`);
-
-    // 処理済みチェック（重複防止）
-    const processedKeys = await getProcessedItemKeys();
-    if (processedKeys.has(deposit.itemKey)) {
-      console.log(`既に処理済み: itemKey=${deposit.itemKey}`);
-      res.status(200).send('Already processed');
-      return;
-    }
-
-    // 会員台帳を取得
-    const members = await getMembers();
-    console.log(`会員台帳: ${members.length}件`);
+    log(`  ${deposits.length}件の入金を検出`);
 
     // 照合
-    const match = matchDeposit(members, deposit);
+    const matches = matchDeposits(members, deposits, processedRefs);
+    log(`  照合結果: ${matches.length}件マッチ`);
 
-    if (!match) {
-      console.warn(`照合失敗（該当なし）: ${deposit.remitterNameKana} / ¥${deposit.depositAmount}`);
-      // TODO: 管理者に通知メール送信
-      res.status(200).send('No match found');
-      return;
+    // 照合結果を処理
+    for (const match of matches) {
+      if (match.confidence === 'high') {
+        log(`  [OK] ${match.member.name} (${match.deposit.depositorName}) → ¥${match.deposit.amount.toLocaleString()}`);
+
+        const receiptNumber = generateReceiptNumber();
+        const receiptPdf = await generateReceiptPdf(match.member, match.deposit, receiptNumber);
+
+        await sendReceiptEmail(
+          match.member.email,
+          match.member.name,
+          receiptPdf,
+          receiptNumber,
+        );
+
+        await markAsProcessed(
+          match.member.email,
+          match.deposit.referenceNumber,
+          receiptNumber,
+        );
+
+        processedRefs.add(match.deposit.referenceNumber);
+        log(`  [SENT] 領収書送信: ${match.member.email} (${receiptNumber})`);
+
+      } else if (match.confidence === 'medium') {
+        log(`  [WARN] 名前一致・金額不一致: ${match.member.name}`);
+        log(`    期待: ${match.member.membershipType} / 入金: ¥${match.deposit.amount.toLocaleString()}`);
+      }
     }
 
-    if (match.confidence === 'high') {
-      // 高信頼度：自動で領収書送信
-      console.log(`照合OK: ${match.member.name} (${match.member.transferName}) → ¥${deposit.depositAmount}`);
-
-      const receiptNumber = generateReceiptNumber();
-      const receiptPdf = await generateReceiptPdf(
-        match.member,
-        deposit,
-        receiptNumber,
-      );
-
-      await sendReceiptEmail(
-        match.member.email,
-        match.member.name,
-        receiptPdf,
-        receiptNumber,
-      );
-
-      await markAsProcessed(
-        match.member.email,
-        deposit.itemKey,
-        new Date().toISOString(),
-      );
-
-      console.log(`領収書送信完了: ${match.member.email} (${receiptNumber})`);
-      res.status(200).send(`Receipt sent: ${receiptNumber}`);
-
-    } else if (match.confidence === 'medium') {
-      // 名前一致だが金額不一致
-      console.warn(`名前一致・金額不一致: ${match.member.name}`);
-      console.warn(`  期待: ${match.member.membershipType} / 入金: ¥${deposit.depositAmount}`);
-      // TODO: 管理者に通知メール送信
-      res.status(200).send('Amount mismatch - manual review needed');
+    // マッチしなかった入金を報告
+    const matchedRefs = new Set(matches.map((m) => m.deposit.referenceNumber));
+    const unmatched = deposits.filter(
+      (d) => !processedRefs.has(d.referenceNumber) && !matchedRefs.has(d.referenceNumber),
+    );
+    if (unmatched.length > 0) {
+      log(`  [UNMATCHED] 照合できない入金: ${unmatched.length}件`);
+      for (const d of unmatched) {
+        log(`    ${d.depositorName} / ¥${d.amount.toLocaleString()} / ${d.date}`);
+      }
     }
 
+    // スクショを処理済みフォルダへ移動
+    await moveToProcessed(screenshot.fileId);
+    log(`  スクショを処理済みフォルダに移動`);
+  }
+
+  log(`\n[${new Date().toISOString()}] 処理完了`);
+  return logs;
+}
+
+/**
+ * Cloud Functions HTTPエントリーポイント
+ * Cloud Schedulerから定期呼び出し、または手動トリガー
+ */
+export const processScreenshots: HttpFunction = async (_req, res) => {
+  try {
+    const logs = await processOnce();
+    res.status(200).json({ status: 'ok', logs });
   } catch (error) {
-    console.error('Webhook処理エラー:', error);
-    res.status(500).send('Internal Server Error');
+    console.error('処理エラー:', error);
+    res.status(500).json({ status: 'error', message: String(error) });
   }
 };
+
+// ローカル実行
+if (require.main === module || process.argv.includes('--once')) {
+  processOnce()
+    .then((logs) => {
+      console.log(`\n=== 完了（${logs.length}行のログ） ===`);
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

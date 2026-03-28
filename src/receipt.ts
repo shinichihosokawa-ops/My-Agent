@@ -6,7 +6,7 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
 import { config } from './config';
-import { Member, GmoDepositWebhook } from './types';
+import { Member, DepositEntry } from './types';
 
 /**
  * 領収書番号を生成（日付ベース + 連番）
@@ -42,7 +42,7 @@ function getBreakdown(membershipType: string): string {
  */
 export async function generateReceiptPdf(
   member: Member,
-  deposit: GmoDepositWebhook,
+  deposit: DepositEntry,
   receiptNumber: string,
 ): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
@@ -62,7 +62,7 @@ export async function generateReceiptPdf(
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const now = new Date();
   const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
-  const amount = parseInt(deposit.depositAmount, 10);
+  const amount = deposit.amount;
 
   const margin = 50;
   let y = 780;

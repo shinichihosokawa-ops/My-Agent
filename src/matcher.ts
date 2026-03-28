@@ -1,14 +1,14 @@
 /**
  * 照合エンジン
- * 会員台帳のカナ名 ⇔ GMOあおぞら入金通知のカナ名 + 金額で照合
+ * 会員台帳のカナ名 ⇔ スクショから抽出したカナ名 + 金額で照合
  */
 import { config } from './config';
-import { Member, GmoDepositWebhook, MatchResult } from './types';
+import { Member, DepositEntry, MatchResult } from './types';
 
 /**
  * カタカナ正規化：半角→全角統一、スペース除去
- * GMOあおぞらは半角カナ（ﾎｿｶﾜ ｼﾝｲﾁ）で来る
- * Googleフォームは全角カナ（ホソカワ シンイチ）で来る
+ * 銀行明細は半角カナ（ﾎｿｶﾜ ｼﾝｲﾁ）の場合がある
+ * Googleフォームは全角カナ（ホソカワ シンイチ）
  */
 function normalizeKana(str: string): string {
   return str
@@ -30,7 +30,7 @@ function normalizeKana(str: string): string {
       };
       return halfToFull[ch] || ch;
     })
-    // 濁点・半濁点の結合（ｶﾞ→ガ等）
+    // 濁点・半濁点の結合（カ゛→ガ等）
     .replace(/([\u30A2-\u30F3])゛/g, (_, base: string) => {
       const code = base.charCodeAt(0);
       return String.fromCharCode(code + 1);
@@ -39,16 +39,8 @@ function normalizeKana(str: string): string {
       const code = base.charCodeAt(0);
       return String.fromCharCode(code + 2);
     })
-    // スペース・全角スペースを除去
-    .replace(/[\s　]/g, '')
-    // 小文字カナを大文字カナに（ァ→ア等）
-    .replace(/[ァィゥェォッャュョ]/g, (ch) => {
-      const map: Record<string, string> = {
-        'ァ': 'ア', 'ィ': 'イ', 'ゥ': 'ウ', 'ェ': 'エ', 'ォ': 'オ',
-        'ッ': 'ツ', 'ャ': 'ヤ', 'ュ': 'ユ', 'ョ': 'ヨ',
-      };
-      return map[ch] || ch;
-    })
+    // スペース・全角スペース・括弧等を除去
+    .replace(/[\s　\(\)（）]/g, '')
     .trim();
 }
 
@@ -65,38 +57,47 @@ function getExpectedAmount(membershipType: string): number | null {
 }
 
 /**
- * 入金通知と会員台帳を照合
+ * 入金明細リストと会員台帳を照合
  */
-export function matchDeposit(
+export function matchDeposits(
   members: Member[],
-  deposit: GmoDepositWebhook,
-): MatchResult | null {
-  const normalizedDepositName = normalizeKana(deposit.remitterNameKana);
-  const depositAmount = parseInt(deposit.depositAmount, 10);
+  deposits: DepositEntry[],
+  processedRefs: Set<string>,
+): MatchResult[] {
+  const results: MatchResult[] = [];
 
-  for (const member of members) {
-    const normalizedMemberName = normalizeKana(member.transferName);
+  for (const deposit of deposits) {
+    // 既に処理済みの照会番号はスキップ
+    if (deposit.referenceNumber && processedRefs.has(deposit.referenceNumber)) continue;
 
-    const nameMatch = normalizedDepositName === normalizedMemberName;
-    const expectedAmount = getExpectedAmount(member.membershipType);
-    const amountMatch = expectedAmount !== null && depositAmount === expectedAmount;
+    const normalizedDepositName = normalizeKana(deposit.depositorName);
 
-    if (nameMatch && amountMatch) {
-      return {
-        member, deposit,
-        confidence: 'high',
-        nameMatch: true, amountMatch: true,
-      };
-    }
+    for (const member of members) {
+      const normalizedMemberName = normalizeKana(member.transferName);
 
-    if (nameMatch && !amountMatch) {
-      return {
-        member, deposit,
-        confidence: 'medium',
-        nameMatch: true, amountMatch: false,
-      };
+      const nameMatch = normalizedDepositName === normalizedMemberName;
+      const expectedAmount = getExpectedAmount(member.membershipType);
+      const amountMatch = expectedAmount !== null && deposit.amount === expectedAmount;
+
+      if (nameMatch && amountMatch) {
+        results.push({
+          member, deposit,
+          confidence: 'high',
+          nameMatch: true, amountMatch: true,
+        });
+        break;
+      }
+
+      if (nameMatch && !amountMatch) {
+        results.push({
+          member, deposit,
+          confidence: 'medium',
+          nameMatch: true, amountMatch: false,
+        });
+        break;
+      }
     }
   }
 
-  return null;
+  return results;
 }

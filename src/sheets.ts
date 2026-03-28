@@ -43,30 +43,30 @@ export async function getMembers(): Promise<Member[]> {
 }
 
 /**
- * 処理済み会員の記録を「処理済み」シートに書き込む
+ * 処理済み記録を「処理済み」シートに書き込む
  */
 export async function markAsProcessed(
   memberEmail: string,
-  depositItemKey: string,
-  receiptSentAt: string,
+  referenceNumber: string,
+  receiptNumber: string,
 ): Promise<void> {
   const sheets = getSheets();
   await ensureProcessedSheet();
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: config.spreadsheetId,
-    range: '処理済み!A:D',
+    range: '処理済み!A:E',
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: [[memberEmail, depositItemKey, new Date().toISOString(), receiptSentAt]],
+      values: [[memberEmail, referenceNumber, receiptNumber, new Date().toISOString(), '送信済み']],
     },
   });
 }
 
 /**
- * 処理済み明細キーの一覧を取得（重複防止用）
+ * 処理済み照会番号の一覧を取得（重複防止用）
  */
-export async function getProcessedItemKeys(): Promise<Set<string>> {
+export async function getProcessedRefs(): Promise<Set<string>> {
   const sheets = getSheets();
   try {
     const res = await sheets.spreadsheets.values.get({
@@ -103,10 +103,10 @@ async function ensureProcessedSheet(): Promise<void> {
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.spreadsheetId,
-    range: '処理済み!A1:D1',
+    range: '処理済み!A1:E1',
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: [['メールアドレス', '明細キー', '照合日時', '領収書送信日時']],
+      values: [['メールアドレス', '照会番号', '領収書番号', '処理日時', 'ステータス']],
     },
   });
 }
