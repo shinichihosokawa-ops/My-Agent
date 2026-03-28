@@ -28,7 +28,7 @@ function formatAmount(amount: number): string {
 function getAnnualFeePeriod(): string {
   const now = new Date();
   const startYear = now.getFullYear();
-  const startMonth = now.getMonth() + 2; // 翌月（0-indexed +1 で今月、+2で翌月）
+  const startMonth = now.getMonth() + 2; // 翌月
   const start = startMonth > 12
     ? `${startYear + 1}年1月`
     : `${startYear}年${startMonth}月`;
@@ -38,17 +38,25 @@ function getAnnualFeePeriod(): string {
   return `${start}〜${end}`;
 }
 
-function getBreakdown(membershipType: string): string {
+/**
+ * 但し書きテキストを生成
+ */
+function getProviso(membershipType: string): string[] {
   const period = getAnnualFeePeriod();
   for (const [key, fees] of Object.entries(config.membershipFees)) {
     if (membershipType.includes(key)) {
-      if (fees.admissionFee === 0) {
-        return `${key} 年会費 ${formatAmount(fees.annualFee)}（${period}分）`;
+      const lines = [
+        '但し：一般社団法人香川イノベーションベース（設立準備中）',
+      ];
+      if (fees.admissionFee > 0) {
+        lines.push(`      入会金(${formatAmount(fees.admissionFee)})および年会費(${formatAmount(fees.annualFee)}／${period}分)の代理受領分として`);
+      } else {
+        lines.push(`      年会費(${formatAmount(fees.annualFee)}／${period}分)の代理受領分として`);
       }
-      return `${key} 入会金 ${formatAmount(fees.admissionFee)} + 年会費 ${formatAmount(fees.annualFee)}（${period}分）`;
+      return lines;
     }
   }
-  return '';
+  return [];
 }
 
 /**
@@ -120,22 +128,32 @@ export async function generateReceiptPdf(
   y -= 35;
 
   // 但し書き
-  const breakdown = getBreakdown(member.membershipType);
-  page.drawText(`但し  ${breakdown}  として`, {
-    x: margin, y, size: 11, font,
+  const provisoLines = getProviso(member.membershipType);
+  for (const line of provisoLines) {
+    page.drawText(line, { x: margin, y, size: 10, font });
+    y -= 18;
+  }
+  y -= 15;
+
+  // 区切り線
+  page.drawLine({
+    start: { x: margin, y }, end: { x: 545, y },
+    thickness: 0.5, color: rgb(0.5, 0.5, 0.5),
   });
-  y -= 40;
+  y -= 25;
 
   // 内訳
+  const period = getAnnualFeePeriod();
   for (const [key, fees] of Object.entries(config.membershipFees)) {
     if (member.membershipType.includes(key)) {
+      page.drawText(`【${key}】`, { x: margin, y, size: 10, font: fontBold });
+      y -= 22;
       if (fees.admissionFee > 0) {
         page.drawText(`入会金: ${formatAmount(fees.admissionFee)}`, {
           x: margin + 20, y, size: 10, font,
         });
         y -= 20;
       }
-      const period = getAnnualFeePeriod();
       page.drawText(`年会費: ${formatAmount(fees.annualFee)}（${period}分）`, {
         x: margin + 20, y, size: 10, font,
       });
@@ -149,17 +167,28 @@ export async function generateReceiptPdf(
   }
 
   // 発行者情報
-  y = 200;
-  page.drawText(config.issuer.name, { x: 350, y, size: 12, font });
+  y = 180;
+
+  // 区切り線
+  page.drawLine({
+    start: { x: 300, y: y + 15 }, end: { x: 545, y: y + 15 },
+    thickness: 0.5, color: rgb(0.5, 0.5, 0.5),
+  });
+
+  page.drawText('発行元：株式会社HOSOKAWA', { x: 310, y, size: 10, font: fontBold });
+  y -= 16;
+  page.drawText('一般社団法人香川イノベーションベース', { x: 330, y, size: 9, font });
+  y -= 14;
+  page.drawText('設立準備事務局 代理', { x: 330, y, size: 9, font });
   y -= 18;
-  page.drawText(config.issuer.address, { x: 350, y, size: 9, font });
-  y -= 15;
-  page.drawText(`TEL: ${config.issuer.tel}`, { x: 350, y, size: 9, font });
-  y -= 15;
+  page.drawText(`住所：${config.issuer.address}`, { x: 310, y, size: 9, font });
+  y -= 14;
+  if (config.issuer.tel) {
+    page.drawText(`TEL：${config.issuer.tel}`, { x: 310, y, size: 9, font });
+    y -= 14;
+  }
   if (config.issuer.registrationNumber) {
-    page.drawText(`登録番号: ${config.issuer.registrationNumber}`, {
-      x: 350, y, size: 9, font,
-    });
+    page.drawText(`登録番号：${config.issuer.registrationNumber}`, { x: 310, y, size: 9, font });
   }
 
   const pdfBytes = await pdfDoc.save();
