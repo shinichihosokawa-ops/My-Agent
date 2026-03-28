@@ -3,6 +3,8 @@
  * pdf-libを使用して領収書を生成
  */
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const fontkit = require('@pdf-lib/fontkit');
 import fs from 'fs';
 import path from 'path';
 import { config } from './config';
@@ -71,6 +73,7 @@ export async function generateReceiptPdf(
   receiptNumber: string,
 ): Promise<Buffer> {
   const pdfDoc = await PDFDocument.create();
+  pdfDoc.registerFontkit(fontkit);
   const page = pdfDoc.addPage([595, 842]); // A4
 
   // フォント読み込み
