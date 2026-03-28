@@ -13,6 +13,10 @@ export const config = {
   // Google SheetsのスプレッドシートID
   spreadsheetId: process.env.SPREADSHEET_ID!,
 
+  // シート名
+  formSheetName: 'Form Responses 1',
+  managementSheetName: '顧客管理データ',
+
   // Google DriveのフォルダID（スクショ投入先）
   driveFolderId: process.env.DRIVE_FOLDER_ID!,
 

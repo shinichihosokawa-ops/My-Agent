@@ -85,7 +85,7 @@ async function processOnce(): Promise<string[]> {
 
         processedRefs.add(match.deposit.referenceNumber);
         log(`  [SENT] 領収書送信: ${match.member.email} (${receiptNumber})`);
-        log(`  [SHEET] J列◯・K列${match.deposit.date}を記録 (行${match.member.rowIndex})`);
+        log(`  [SHEET] 顧客管理データ K列◯・L列${match.deposit.date}を記録 (行${match.member.rowIndex})`);
 
       } else if (match.confidence === 'medium') {
         log(`  [WARN] 名前一致・金額不一致: ${match.member.name}`);

@@ -1,6 +1,8 @@
 /**
  * Google Sheets API 連携
- * フォーム回答（会員台帳）の読み取り・入金確認書き込み・処理済み記録
+ * - Form Responses 1: フォーム回答（会員データ）の読み取り
+ * - 顧客管理データ: 入金確認（K列）・入金日（L列）の読み書き
+ * - 処理済み: 処理済み記録
  */
 import { google, sheets_v4 } from 'googleapis';
 import { createOAuth2Client } from './auth';
@@ -17,19 +19,31 @@ function getSheets(): sheets_v4.Sheets {
 }
 
 /**
- * フォーム回答シートから全会員データを取得（A〜K列）
+ * 会員データを取得
+ * - Form Responses 1 (A〜I列) から会員情報を読み取り
+ * - 顧客管理データ (K〜L列) から入金確認・入金日を読み取り
+ * - 行番号で結合して返す
  */
 export async function getMembers(): Promise<Member[]> {
   const sheets = getSheets();
-  const res = await sheets.spreadsheets.values.get({
+
+  // フォーム回答から会員データを取得（A〜I列）
+  const formRes = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheetId,
-    range: 'フォームの回答 1!A2:K',
+    range: `'${config.formSheetName}'!A2:I`,
   });
 
-  const rows = res.data.values;
+  const rows = formRes.data.values;
   if (!rows || rows.length === 0) {
     return [];
   }
+
+  // 顧客管理データから入金確認・入金日を取得（K〜L列）
+  const paymentRes = await sheets.spreadsheets.values.get({
+    spreadsheetId: config.spreadsheetId,
+    range: `'${config.managementSheetName}'!K2:L`,
+  });
+  const paymentRows = paymentRes.data.values || [];
 
   return rows.map((row, index) => ({
     rowIndex: index + 2,  // ヘッダーが1行目なので、データは2行目から
@@ -42,19 +56,19 @@ export async function getMembers(): Promise<Member[]> {
     expectedDate: row[6] || '',           // G列: 振込予定日
     forumParticipation: row[7] || '',     // H列: フォーラム参加希望
     mentoringParticipation: row[8] || '', // I列: メンタリング参加希望
-    paymentConfirmed: row[9] || '',       // J列: 入金確認（◯）
-    paymentDate: row[10] || '',           // K列: 入金日
+    paymentConfirmed: paymentRows[index]?.[0] || '',  // 顧客管理データ K列: 入金確認
+    paymentDate: paymentRows[index]?.[1] || '',        // 顧客管理データ L列: 入金日
   }));
 }
 
 /**
- * J列・K列のヘッダーが未設定なら書き込む（初回実行時のみ）
+ * 顧客管理データのK列・L列のヘッダーが未設定なら書き込む（初回実行時のみ）
  */
 export async function ensurePaymentHeaders(): Promise<void> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheetId,
-    range: 'フォームの回答 1!J1:K1',
+    range: `'${config.managementSheetName}'!K1:L1`,
   });
 
   const headers = res.data.values?.[0] || [];
@@ -62,7 +76,7 @@ export async function ensurePaymentHeaders(): Promise<void> {
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.spreadsheetId,
-    range: 'フォームの回答 1!J1:K1',
+    range: `'${config.managementSheetName}'!K1:L1`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [['入金確認', '入金日']],
@@ -71,7 +85,7 @@ export async function ensurePaymentHeaders(): Promise<void> {
 }
 
 /**
- * J列に◯、K列に入金日を書き込む
+ * 顧客管理データのK列に◯、L列に入金日を書き込む
  */
 export async function markPaymentConfirmed(
   rowIndex: number,
@@ -80,7 +94,7 @@ export async function markPaymentConfirmed(
   const sheets = getSheets();
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.spreadsheetId,
-    range: `フォームの回答 1!J${rowIndex}:K${rowIndex}`,
+    range: `'${config.managementSheetName}'!K${rowIndex}:L${rowIndex}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [['◯', paymentDate]],
