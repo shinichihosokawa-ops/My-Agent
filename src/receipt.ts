@@ -42,18 +42,18 @@ function getAnnualFeePeriod(): string {
  * 但し書きテキストを生成
  */
 function getProviso(membershipType: string): string[] {
-  const period = getAnnualFeePeriod();
-  for (const [key, fees] of Object.entries(config.membershipFees)) {
-    if (membershipType.includes(key)) {
-      const lines = [
-        '但し：一般社団法人香川イノベーションベース（設立準備中）',
-      ];
+  for (const [_key, fees] of Object.entries(config.membershipFees)) {
+    if (membershipType.includes(_key)) {
       if (fees.admissionFee > 0) {
-        lines.push(`      入会金(${formatAmount(fees.admissionFee)})および年会費(${formatAmount(fees.annualFee)}／${period}分)の代理受領分として`);
-      } else {
-        lines.push(`      年会費(${formatAmount(fees.annualFee)}／${period}分)の代理受領分として`);
+        return [
+          '但し：一般社団法人香川イノベーションベース（設立準備中）',
+          '      入会金および年会費の代理受領分として',
+        ];
       }
-      return lines;
+      return [
+        '但し：一般社団法人香川イノベーションベース（設立準備中）',
+        '      年会費の代理受領分として',
+      ];
     }
   }
   return [];
