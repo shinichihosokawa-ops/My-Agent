@@ -1,15 +1,17 @@
 /** Googleフォームからの会員登録データ（Sheetsの1行） */
 export interface Member {
   rowIndex: number;            // シート上の行番号（2始まり、ヘッダー除く）
-  timestamp: string;
-  email: string;
-  name: string;                // 氏名（漢字）
-  transferName: string;        // 振込口座名義（カタカナ）
-  receiptAddress: string;      // 領収書宛名
-  membershipType: string;      // 会員区分（選択肢テキスト）
-  expectedDate: string;        // 振込予定日
-  paymentConfirmed: string;    // H列: 入金確認（◯ = 確認済み）
-  paymentDate: string;         // I列: 入金日
+  timestamp: string;           // A列: タイムスタンプ
+  email: string;               // B列: メールアドレス
+  name: string;                // C列: 氏名（漢字）
+  transferName: string;        // D列: 振込口座名義（カタカナ）
+  receiptAddress: string;      // E列: 領収書宛名
+  membershipType: string;      // F列: 会員区分（選択肢テキスト）
+  expectedDate: string;        // G列: 振込予定日
+  forumParticipation: string;  // H列: フォーラム参加希望
+  mentoringParticipation: string; // I列: メンタリング参加希望
+  paymentConfirmed: string;    // J列: 入金確認（◯ = 確認済み）
+  paymentDate: string;         // K列: 入金日
 }
 
 /** スクリーンショットから抽出した入金明細1件 */

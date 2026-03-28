@@ -17,13 +17,13 @@ function getSheets(): sheets_v4.Sheets {
 }
 
 /**
- * フォーム回答シートから全会員データを取得（H列・I列含む）
+ * フォーム回答シートから全会員データを取得（A〜K列）
  */
 export async function getMembers(): Promise<Member[]> {
   const sheets = getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.spreadsheetId,
-    range: 'フォームの回答 1!A2:I',
+    range: 'フォームの回答 1!A2:K',
   });
 
   const rows = res.data.values;
@@ -33,20 +33,22 @@ export async function getMembers(): Promise<Member[]> {
 
   return rows.map((row, index) => ({
     rowIndex: index + 2,  // ヘッダーが1行目なので、データは2行目から
-    timestamp: row[0] || '',
-    email: row[1] || '',
-    name: row[2] || '',
-    transferName: row[3] || '',
-    receiptAddress: row[4] || '',
-    membershipType: row[5] || '',
-    expectedDate: row[6] || '',
-    paymentConfirmed: row[7] || '',  // H列
-    paymentDate: row[8] || '',       // I列
+    timestamp: row[0] || '',              // A列: タイムスタンプ
+    email: row[1] || '',                  // B列: メールアドレス
+    name: row[2] || '',                   // C列: 氏名（漢字）
+    transferName: row[3] || '',           // D列: 振込口座名義（カタカナ）
+    receiptAddress: row[4] || '',         // E列: 領収書宛名
+    membershipType: row[5] || '',         // F列: 会員区分
+    expectedDate: row[6] || '',           // G列: 振込予定日
+    forumParticipation: row[7] || '',     // H列: フォーラム参加希望
+    mentoringParticipation: row[8] || '', // I列: メンタリング参加希望
+    paymentConfirmed: row[9] || '',       // J列: 入金確認（◯）
+    paymentDate: row[10] || '',           // K列: 入金日
   }));
 }
 
 /**
- * H列に◯、I列に入金日を書き込む
+ * J列に◯、K列に入金日を書き込む
  */
 export async function markPaymentConfirmed(
   rowIndex: number,
@@ -55,7 +57,7 @@ export async function markPaymentConfirmed(
   const sheets = getSheets();
   await sheets.spreadsheets.values.update({
     spreadsheetId: config.spreadsheetId,
-    range: `フォームの回答 1!H${rowIndex}:I${rowIndex}`,
+    range: `フォームの回答 1!J${rowIndex}:K${rowIndex}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [['◯', paymentDate]],
