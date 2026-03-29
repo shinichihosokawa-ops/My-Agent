@@ -204,6 +204,25 @@ export async function generateReceiptPdf(
   });
 
   page.drawText('発行元：株式会社HOSOKAWA', { x: 310, y, size: 10, font: fontBold });
+
+  // 社印画像を「株式会社HOSOKAWA」の右横に配置
+  const sealPaths = [
+    path.join(__dirname, '..', 'assets', 'seal.png'),
+    path.join(process.cwd(), 'assets', 'seal.png'),
+  ];
+  const sealPath = sealPaths.find((p) => fs.existsSync(p));
+  if (sealPath) {
+    const sealBytes = fs.readFileSync(sealPath);
+    const sealImage = await pdfDoc.embedPng(sealBytes);
+    const sealSize = 50;
+    page.drawImage(sealImage, {
+      x: 490,
+      y: y - 25,
+      width: sealSize,
+      height: sealSize,
+    });
+  }
+
   y -= 16;
   page.drawText('一般社団法人香川イノベーションベース', { x: 330, y, size: 9, font });
   y -= 14;
