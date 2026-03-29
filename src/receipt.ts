@@ -217,15 +217,14 @@ export async function generateReceiptPdf(
     if (sealPath) break;
   }
   if (sealPath) {
-    console.log(`社印読み込み: ${sealPath}`);
     try {
-      const sealBytes = fs.readFileSync(sealPath);
-      let sealImage;
-      if (sealPath.endsWith('.png')) {
-        sealImage = await pdfDoc.embedPng(sealBytes);
-      } else {
-        sealImage = await pdfDoc.embedJpg(sealBytes);
-      }
+      // sharpで150x150にリサイズしてPNG変換（軽量化）
+      const sharp = require('sharp');
+      const resizedBytes = await sharp(sealPath)
+        .resize(150, 150)
+        .png()
+        .toBuffer();
+      const sealImage = await pdfDoc.embedPng(resizedBytes);
       const sealSize = 50;
       page.drawImage(sealImage, {
         x: 490,
@@ -234,20 +233,7 @@ export async function generateReceiptPdf(
         height: sealSize,
       });
     } catch (e) {
-      console.warn(`社印の埋め込みに失敗（形式変換を試みます）: ${e}`);
-      try {
-        const sealBytes = fs.readFileSync(sealPath);
-        const sealImage = await pdfDoc.embedJpg(sealBytes);
-        const sealSize = 50;
-        page.drawImage(sealImage, {
-          x: 490,
-          y: y - 25,
-          width: sealSize,
-          height: sealSize,
-        });
-      } catch (e2) {
-        console.error(`社印の埋め込みに失敗: ${e2}`);
-      }
+      console.error(`社印の埋め込みに失敗: ${e}`);
     }
   } else {
     console.warn('社印画像が見つかりません。assets/seal.png を配置してください。');
