@@ -206,21 +206,51 @@ export async function generateReceiptPdf(
   page.drawText('発行元：株式会社HOSOKAWA', { x: 310, y, size: 10, font: fontBold });
 
   // 社印画像を「株式会社HOSOKAWA」の右横に配置
-  const sealPaths = [
-    path.join(__dirname, '..', 'assets', 'seal.png'),
-    path.join(process.cwd(), 'assets', 'seal.png'),
-  ];
-  const sealPath = sealPaths.find((p) => fs.existsSync(p));
+  const sealFiles = ['seal.png', 'seal.jpg', 'seal.jpeg'];
+  let sealPath: string | undefined;
+  for (const file of sealFiles) {
+    const candidates = [
+      path.join(__dirname, '..', 'assets', file),
+      path.join(process.cwd(), 'assets', file),
+    ];
+    sealPath = candidates.find((p) => fs.existsSync(p));
+    if (sealPath) break;
+  }
   if (sealPath) {
-    const sealBytes = fs.readFileSync(sealPath);
-    const sealImage = await pdfDoc.embedPng(sealBytes);
-    const sealSize = 50;
-    page.drawImage(sealImage, {
-      x: 490,
-      y: y - 25,
-      width: sealSize,
-      height: sealSize,
-    });
+    console.log(`社印読み込み: ${sealPath}`);
+    try {
+      const sealBytes = fs.readFileSync(sealPath);
+      let sealImage;
+      if (sealPath.endsWith('.png')) {
+        sealImage = await pdfDoc.embedPng(sealBytes);
+      } else {
+        sealImage = await pdfDoc.embedJpg(sealBytes);
+      }
+      const sealSize = 50;
+      page.drawImage(sealImage, {
+        x: 490,
+        y: y - 25,
+        width: sealSize,
+        height: sealSize,
+      });
+    } catch (e) {
+      console.warn(`社印の埋め込みに失敗（形式変換を試みます）: ${e}`);
+      try {
+        const sealBytes = fs.readFileSync(sealPath);
+        const sealImage = await pdfDoc.embedJpg(sealBytes);
+        const sealSize = 50;
+        page.drawImage(sealImage, {
+          x: 490,
+          y: y - 25,
+          width: sealSize,
+          height: sealSize,
+        });
+      } catch (e2) {
+        console.error(`社印の埋め込みに失敗: ${e2}`);
+      }
+    }
+  } else {
+    console.warn('社印画像が見つかりません。assets/seal.png を配置してください。');
   }
 
   y -= 16;
