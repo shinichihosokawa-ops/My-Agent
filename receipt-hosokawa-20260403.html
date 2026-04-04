@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>領収書 - 株式会社HOSOKAWA</title>
+<style>
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  body {
+    font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+    background: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+  }
+  .receipt-page {
+    width: 210mm;
+    min-height: 297mm;
+    background: #fff;
+    padding: 50px 60px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    position: relative;
+  }
+  .title {
+    text-align: center;
+    font-size: 36px;
+    font-weight: bold;
+    letter-spacing: 20px;
+    margin-bottom: 40px;
+    padding-bottom: 10px;
+    border-bottom: 3px double #333;
+  }
+  .receipt-no {
+    text-align: right;
+    font-size: 13px;
+    margin-bottom: 8px;
+    color: #555;
+  }
+  .date {
+    text-align: right;
+    font-size: 14px;
+    margin-bottom: 30px;
+  }
+  .recipient {
+    font-size: 22px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #333;
+    display: inline-block;
+    min-width: 320px;
+  }
+  .recipient-suffix {
+    font-size: 16px;
+    margin-left: 10px;
+  }
+  .amount-section {
+    margin: 35px 0;
+    border: 2px solid #333;
+    padding: 18px 30px;
+    text-align: center;
+    background: #fafafa;
+  }
+  .amount-label {
+    font-size: 14px;
+    margin-bottom: 5px;
+  }
+  .amount {
+    font-size: 32px;
+    font-weight: bold;
+    letter-spacing: 3px;
+  }
+  .amount .yen {
+    font-size: 22px;
+    margin-right: 5px;
+  }
+  .amount .dash {
+    margin: 0 3px;
+  }
+  .details-section {
+    margin: 30px 0;
+  }
+  .details-section table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  .details-section th {
+    background: #f5f5f5;
+    border: 1px solid #999;
+    padding: 10px 15px;
+    text-align: center;
+    font-weight: bold;
+    width: 130px;
+  }
+  .details-section td {
+    border: 1px solid #999;
+    padding: 10px 15px;
+  }
+  .proviso {
+    margin: 25px 0;
+    font-size: 14px;
+  }
+  .proviso-label {
+    font-weight: bold;
+    margin-right: 10px;
+  }
+  .proviso-content {
+    border-bottom: 1px solid #333;
+    padding-bottom: 3px;
+    display: inline-block;
+    min-width: 450px;
+  }
+  .tax-note {
+    font-size: 12px;
+    color: #666;
+    margin: 10px 0 30px 0;
+  }
+  .issuer-section {
+    margin-top: 60px;
+    text-align: right;
+    position: relative;
+  }
+  .issuer-info {
+    display: inline-block;
+    text-align: left;
+    font-size: 13px;
+    line-height: 1.8;
+    position: relative;
+  }
+  .issuer-company {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 5px;
+  }
+  /* Hosokawa Company Seal */
+  .seal-container {
+    position: absolute;
+    right: 10px;
+    bottom: -10px;
+    width: 90px;
+    height: 90px;
+  }
+  .seal-svg {
+    width: 90px;
+    height: 90px;
+    opacity: 0.85;
+  }
+  .footer-note {
+    margin-top: 80px;
+    text-align: center;
+    font-size: 11px;
+    color: #999;
+    border-top: 1px solid #ddd;
+    padding-top: 15px;
+  }
+
+  @media print {
+    body {
+      background: #fff;
+      padding: 0;
+    }
+    .receipt-page {
+      box-shadow: none;
+      padding: 40px 50px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="receipt-page">
+
+  <div class="receipt-no">No. RCP-20260403-001</div>
+
+  <div class="title">領 収 書</div>
+
+  <div class="date">発行日：2026年4月3日</div>
+
+  <div>
+    <span class="recipient">Mr. Rohan</span>
+    <span class="recipient-suffix">様</span>
+  </div>
+
+  <div class="amount-section">
+    <div class="amount">
+      <span class="yen">￥</span>16,500<span class="dash">－</span>
+    </div>
+  </div>
+
+  <div class="proviso">
+    <span class="proviso-label">但し</span>
+    <span class="proviso-content">KAIB月例会（4月3日開催）参加費 3名分 として</span>
+  </div>
+
+  <div class="tax-note">※ 上記金額は税込みです（内消費税等 ￥1,500）</div>
+
+  <div class="details-section">
+    <table>
+      <tr>
+        <th>摘要</th>
+        <td>KAIB Monthly Meeting 参加費（April 3rd, 2026）</td>
+      </tr>
+      <tr>
+        <th>人数</th>
+        <td>3名（For 3 people）</td>
+      </tr>
+      <tr>
+        <th>単価</th>
+        <td>￥5,500 × 3名 ＝ ￥16,500</td>
+      </tr>
+      <tr>
+        <th>お支払方法</th>
+        <td>現金</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="issuer-section">
+    <div class="issuer-info">
+      <div class="issuer-company">株式会社HOSOKAWA</div>
+      <div>一般社団法人香川イノベーションベース（KAIB）</div>
+      <div>運営事務局</div>
+
+      <!-- Hosokawa Company Seal (社印) -->
+      <div class="seal-container">
+        <svg class="seal-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- Outer circle -->
+          <circle cx="100" cy="100" r="92" fill="none" stroke="#c41e3a" stroke-width="4"/>
+          <!-- Inner circle -->
+          <circle cx="100" cy="100" r="82" fill="none" stroke="#c41e3a" stroke-width="2"/>
+          <!-- Horizontal divider lines -->
+          <line x1="25" y1="72" x2="175" y2="72" stroke="#c41e3a" stroke-width="1.5"/>
+          <line x1="25" y1="128" x2="175" y2="128" stroke="#c41e3a" stroke-width="1.5"/>
+          <!-- Top text: 株式会社 -->
+          <text x="100" y="58" text-anchor="middle" fill="#c41e3a"
+                font-family="'Yu Mincho','YuMincho','Hiragino Mincho ProN','MS PMincho',serif"
+                font-size="22" font-weight="bold" letter-spacing="8">株式会社</text>
+          <!-- Center main text: HOSOKAWA (large) -->
+          <text x="100" y="108" text-anchor="middle" fill="#c41e3a"
+                font-family="'Yu Mincho','YuMincho','Hiragino Mincho ProN','MS PMincho',serif"
+                font-size="28" font-weight="bold" letter-spacing="3">HOSOKAWA</text>
+          <!-- Bottom text: 之印 -->
+          <text x="100" y="150" text-anchor="middle" fill="#c41e3a"
+                font-family="'Yu Mincho','YuMincho','Hiragino Mincho ProN','MS PMincho',serif"
+                font-size="22" font-weight="bold" letter-spacing="12">之　印</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    この領収書は正式な支払い証明として発行されたものです。<br>
+    This receipt is issued as an official proof of payment.
+  </div>
+
+</div>
+</body>
+</html>
