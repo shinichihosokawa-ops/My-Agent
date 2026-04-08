@@ -25,18 +25,21 @@ function formatAmount(amount: number): string {
 }
 
 /**
- * 年会費の対象期間を算出（入金月の翌月から1年間）
+ * 年会費の対象期間を算出（入金月から1年間）
  */
-function getAnnualFeePeriod(): string {
-  const now = new Date();
-  const startYear = now.getFullYear();
-  const startMonth = now.getMonth() + 2; // 翌月
-  const start = startMonth > 12
-    ? `${startYear + 1}年1月`
-    : `${startYear}年${startMonth}月`;
-  const endMonth = startMonth > 12 ? 1 : startMonth;
-  const endYear = startMonth > 12 ? startYear + 2 : startYear + 1;
-  const end = `${endYear}年${endMonth}月`;
+function getAnnualFeePeriod(paymentDateStr?: string): string {
+  let baseDate: Date;
+  if (paymentDateStr) {
+    const parsed = new Date(paymentDateStr);
+    baseDate = !isNaN(parsed.getTime()) ? parsed : new Date();
+  } else {
+    baseDate = new Date();
+  }
+  const startYear = baseDate.getFullYear();
+  const startMonth = baseDate.getMonth() + 1; // 入金月
+  const start = `${startYear}年${startMonth}月`;
+  const endYear = startYear + 1;
+  const end = `${endYear}年${startMonth}月`;
   return `${start}〜${end}`;
 }
 
@@ -171,7 +174,7 @@ export async function generateReceiptPdf(
   y -= 25;
 
   // 内訳
-  const period = getAnnualFeePeriod();
+  const period = getAnnualFeePeriod(overrideDate);
   for (const [key, fees] of Object.entries(config.membershipFees)) {
     if (member.membershipType.includes(key)) {
       page.drawText(`【${key}】`, { x: margin, y, size: 10, font: fontBold });
