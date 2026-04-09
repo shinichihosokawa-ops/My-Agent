@@ -1,0 +1,11 @@
+.git
+.gitignore
+node_modules/
+src/
+.env
+token.json
+credentials.json
+env.yaml
+*.ts
+tsconfig.json
+CLAUDE.md

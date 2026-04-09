@@ -9,7 +9,8 @@
     "dev": "npx ts-node src/index.ts",
     "auth": "npx ts-node src/auth.ts",
     "process": "npx ts-node src/index.ts --once",
-    "deploy": "gcloud functions deploy membership-fee-process --runtime nodejs20 --trigger-http --allow-unauthenticated --entry-point processScreenshots --source=. --region=asia-northeast1"
+    "predeploy": "npm run build && cp -r fonts dist/ && cp -r assets dist/",
+    "deploy": "npm run predeploy && gcloud functions deploy membership-fee-process --gen2 --runtime nodejs20 --trigger-http --allow-unauthenticated --entry-point processScreenshots --source=. --region=asia-northeast1 --memory=512MB --timeout=120s --env-vars-file=env.yaml"
   },
   "repository": {
     "type": "git",
