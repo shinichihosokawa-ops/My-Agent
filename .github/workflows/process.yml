@@ -1,0 +1,47 @@
+name: 会費処理 - 入金確認・領収書送信
+
+on:
+  # 1. 毎日朝9時（JST）に自動実行
+  schedule:
+    - cron: '0 0 * * *'  # UTC 0:00 = JST 9:00
+
+  # 2. 手動実行（GitHub UIまたはAPI経由）
+  workflow_dispatch:
+
+  # 3. トリガーファイル更新で実行（Claude Code Webから起動用）
+  push:
+    paths:
+      - '.github/trigger.txt'
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 依存パッケージインストール
+        run: npm ci
+
+      - name: TypeScriptビルド
+        run: npm run build
+
+      - name: 会費処理実行
+        run: node dist/index.js --once
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ISSUER_NAME: ${{ secrets.ISSUER_NAME }}
+          ISSUER_ADDRESS: ${{ secrets.ISSUER_ADDRESS }}
