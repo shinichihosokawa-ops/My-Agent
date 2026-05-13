@@ -4,3 +4,5 @@ dist/
 env.yaml
 token.json
 credentials.json
+test-invoice*.pdf
+test-invoice-base64*.txt
